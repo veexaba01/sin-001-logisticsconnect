@@ -88,4 +88,16 @@ public class IngestionServiceTest
             assertTrue(isUnique, "Duplicate sorting center found: " + item.getSortingCenter());
         }
     }
+
+    /**
+     * Verifies that toJsonArray formats a list of cleaned Hub objects as a JSON array.
+     */
+    @Test
+    public void testToJsonArray_FormatsHubsAsJson()
+    {
+        Hub item = new Hub("H-501", "Western Cape", "Cape Town Port", true);
+        String json = IngestionServiceApp.toJsonArray(List.of(item));
+
+        assertEquals("[{\"id\":\"H-501\",\"province\":\"Western Cape\",\"sortingCenter\":\"Cape Town Port\",\"active\":true}]", json);
+    }
 }
