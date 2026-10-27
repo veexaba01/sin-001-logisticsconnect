@@ -3,8 +3,7 @@ package co.wethinkcode.logisticsconnect;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class IngestionServiceTest {
     private IngestionService service;
@@ -31,5 +30,19 @@ public class IngestionServiceTest {
 
         String[] kznVariant = {"H-506", "Kwa-Zulu Natal", "durban harbour", "Y"};
         assertEquals("KwaZulu-Natal", service.cleanRecord(kznVariant).getProvince());
+    }
+
+    /**
+     * Verifies that blank values and placeholder tokens are converted to null.
+     */
+    @Test
+    public void testCleanSingleRecord_PlaceholdersBecomeNull()
+    {
+        String[] rawLine = {"H-508", "", "unknown", "Y"};
+        Hub result = service.cleanRecord(rawLine);
+
+        assertEquals("H-508", result.getId());
+        assertNull(result.getProvince());
+        assertNull(result.getSortingCenter());
     }
 }
