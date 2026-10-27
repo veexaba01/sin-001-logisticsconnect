@@ -1,5 +1,12 @@
 package co.wethinkcode.logisticsconnect;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -26,6 +33,55 @@ public class IngestionService
         boolean active = cleanActiveFlag(rawLine[3]);
 
         return new Hub(id, province, sortingCenter, active);
+    }
+
+    /**
+     * Reads hubs-global.csv from an InputStream, cleans each row, and collapses duplicate sorting centers.
+     */
+    public List<Hub> cleanCsv(InputStream csvStream)
+    {
+        Map<String, Hub> uniqueHubs = new LinkedHashMap<>();
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(csvStream)))
+        {
+            String line;
+            while ((line = reader.readLine()) != null)
+            {
+                processLine(line, uniqueHubs);
+            }
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException("Error reading CSV file", e);
+        }
+
+        return new ArrayList<>(uniqueHubs.values());
+    }
+
+    /**
+     * Cleans one non-header CSV line and keeps the first occurrence of each sorting center.
+     */
+    private void processLine(String line, Map<String, Hub> uniqueHubs)
+    {
+        if (isSkippableLine(line))
+        {
+            return;
+        }
+
+        Hub cleaned = cleanRecord(line.split(",", -1));
+        if (cleaned != null)
+        {
+            String key = (cleaned.getSortingCenter() != null) ? cleaned.getSortingCenter() : cleaned.getId();
+            uniqueHubs.putIfAbsent(key, cleaned);
+        }
+    }
+
+    /**
+     * Returns true if the line is blank or is the CSV header row.
+     */
+    private boolean isSkippableLine(String line)
+    {
+        return line.isBlank() || line.trim().toLowerCase().startsWith("hub_id");
     }
 
     /**
