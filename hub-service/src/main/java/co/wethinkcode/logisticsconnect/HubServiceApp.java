@@ -1,6 +1,7 @@
 package co.wethinkcode.logisticsconnect;
 
 import io.javalin.Javalin;
+import io.javalin.http.Context;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -66,6 +67,25 @@ public class HubServiceApp {
         if (response.statusCode() == 200)
         {
             cachedHubsJson = response.body();
+        }
+    }
+
+    /**
+     * Returns 200 OK if the hub exists, or 404 Not Found if unknown.
+     */
+    private static void handleGetHubById(Context ctx)
+    {
+        String hubId = ctx.pathParam("hubId").trim().toUpperCase();
+
+        if (isValidHubId(cachedHubsJson, hubId))
+        {
+            ctx.status(200).contentType("application/json")
+                    .result("{\"hubId\":\"" + hubId + "\",\"valid\":true}");
+        }
+        else
+        {
+            ctx.status(404).contentType("application/json")
+                    .result("{\"error\":\"Hub not found\",\"hubId\":\"" + hubId + "\"}");
         }
     }
 }
