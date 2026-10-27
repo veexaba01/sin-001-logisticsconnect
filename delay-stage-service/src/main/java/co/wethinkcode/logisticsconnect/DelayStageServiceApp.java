@@ -18,6 +18,7 @@ public class DelayStageServiceApp {
         // TODO (Tracks the Transit Delay Stage (0-8, e.g. weather shutdowns).)
         // Add domain endpoints for delay-stage-service here.
         app.get("/delay-stage/{hubId}", DelayStageServiceApp::handleGetStage);
+        app.post("/delay-stage/{hubId}", DelayStageServiceApp::handleUpdateStage);
     }
 
     /**
@@ -57,6 +58,27 @@ public class DelayStageServiceApp {
         }
         String digits = rawInput.replaceAll("[^0-9-]", "");
         return digits.isEmpty() ? -1 : Integer.parseInt(digits);
+    }
+
+    /**
+     * Updates the delay stage (0-8) for a hub, or returns 400 Bad Request if invalid.
+     */
+    private static void handleUpdateStage(Context ctx)
+    {
+        String hubId = ctx.pathParam("hubId").trim().toUpperCase();
+        String input = (ctx.queryParam("stage") != null) ? ctx.queryParam("stage") : ctx.body();
+        int newStage = parseStage(input);
+
+        if (isValidStage(newStage))
+        {
+            stagesByHub.put(hubId, newStage);
+            ctx.status(200).contentType("application/json").result(buildStageJson(hubId, newStage));
+        }
+        else
+        {
+            ctx.status(400).contentType("application/json")
+                    .result("{\"error\":\"Delay stage must be between 0 and 8\"}");
+        }
     }
 }
 
