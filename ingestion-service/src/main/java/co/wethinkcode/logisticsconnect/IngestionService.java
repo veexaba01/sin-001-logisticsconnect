@@ -1,10 +1,14 @@
 package co.wethinkcode.logisticsconnect;
 
+import java.util.Set;
+
 /**
  * Cleans and normalizes raw hub records from hubs-global.csv.
  */
 public class IngestionService
 {
+    private static final Set<String> PLACEHOLDERS = Set.of("", "n/a", "tbd", "unknown", "-", "nan");
+
     /**
      * Cleans a single 4-column CSV row into a normalized Hub object.
      */
@@ -24,11 +28,11 @@ public class IngestionService
     }
 
     /**
-     * Trims whitespace and converts the hub ID to uppercase.
+     * Trims whitespace and converts the hub ID to uppercase, or returns null if placeholder.
      */
     private String cleanId(String raw)
     {
-        if (raw == null || raw.trim().isEmpty())
+        if (isPlaceholder(raw))
         {
             return null;
         }
@@ -36,11 +40,11 @@ public class IngestionService
     }
 
     /**
-     * Trims, collapses spaces, and normalizes province names and KwaZulu-Natal variants.
+     * Trims, collapses spaces, and normalizes province names, or returns null if placeholder.
      */
     private String cleanProvince(String raw)
     {
-        if (raw == null || raw.trim().isEmpty())
+        if (isPlaceholder(raw))
         {
             return null;
         }
@@ -53,11 +57,11 @@ public class IngestionService
     }
 
     /**
-     * Trims, collapses internal double spaces, and Title-Cases the sorting center name.
+     * Trims, collapses internal double spaces, and Title-Cases the sorting center, or returns null if placeholder.
      */
     private String cleanSortingCenter(String raw)
     {
-        if (raw == null || raw.trim().isEmpty())
+        if (isPlaceholder(raw))
         {
             return null;
         }
@@ -100,5 +104,17 @@ public class IngestionService
             return word;
         }
         return word.substring(0, 1).toUpperCase() + word.substring(1);
+    }
+
+    /**
+     * Returns true if the value is null, blank, or a known placeholder token.
+     */
+    private boolean isPlaceholder(String value)
+    {
+        if (value == null)
+        {
+            return true;
+        }
+        return PLACEHOLDERS.contains(value.trim().toLowerCase());
     }
 }
