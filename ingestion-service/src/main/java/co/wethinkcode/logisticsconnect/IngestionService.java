@@ -8,6 +8,7 @@ import java.util.Set;
 public class IngestionService
 {
     private static final Set<String> PLACEHOLDERS = Set.of("", "n/a", "tbd", "unknown", "-", "nan");
+    private static final Set<String> TRUE_FLAGS = Set.of("y", "yes", "1", "true");
 
     /**
      * Cleans a single 4-column CSV row into a normalized Hub object.
@@ -70,7 +71,7 @@ public class IngestionService
     }
 
     /**
-     * Normalizes the active flag boolean representation.
+     * Normalizes the active flag boolean representation (Y, yes, 1, true -> true).
      */
     private boolean cleanActiveFlag(String raw)
     {
@@ -78,7 +79,20 @@ public class IngestionService
         {
             return false;
         }
-        return raw.trim().equalsIgnoreCase("y");
+        String flag = raw.trim().toLowerCase();
+        return TRUE_FLAGS.contains(flag);
+    }
+
+    /**
+     * Returns true if the value is null, blank, or a known placeholder token.
+     */
+    private boolean isPlaceholder(String value)
+    {
+        if (value == null)
+        {
+            return true;
+        }
+        return PLACEHOLDERS.contains(value.trim().toLowerCase());
     }
 
     /**
@@ -104,17 +118,5 @@ public class IngestionService
             return word;
         }
         return word.substring(0, 1).toUpperCase() + word.substring(1);
-    }
-
-    /**
-     * Returns true if the value is null, blank, or a known placeholder token.
-     */
-    private boolean isPlaceholder(String value)
-    {
-        if (value == null)
-        {
-            return true;
-        }
-        return PLACEHOLDERS.contains(value.trim().toLowerCase());
     }
 }
