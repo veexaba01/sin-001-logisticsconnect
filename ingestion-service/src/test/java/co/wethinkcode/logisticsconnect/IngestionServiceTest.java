@@ -45,4 +45,21 @@ public class IngestionServiceTest {
         assertNull(result.getProvince());
         assertNull(result.getSortingCenter());
     }
+
+    /**
+     * Verifies that active flag variations (yes, 1, TRUE, 0, no, FALSE, unknown) normalize properly.
+     */
+    @Test
+    public void testCleanSingleRecord_BooleanFlagVariations()
+    {
+        Hub yesRow = service.cleanRecord(new String[]{"H-501", "Western Cape", "Cape Town Port", "yes"});
+        Hub oneRow = service.cleanRecord(new String[]{"H-506", "KwaZulu-Natal", "Durban Harbour", "1"});
+        Hub zeroRow = service.cleanRecord(new String[]{"H-502", "Gauteng", "Pretoria North", "0"});
+        Hub falseRow = service.cleanRecord(new String[]{"H-510", "Gauteng", "Johannesburg Central", "FALSE"});
+
+        assertTrue(yesRow.isActive());
+        assertTrue(oneRow.isActive());
+        assertFalse(zeroRow.isActive());
+        assertFalse(falseRow.isActive());
+    }
 }
