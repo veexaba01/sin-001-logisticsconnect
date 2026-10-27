@@ -3,9 +3,18 @@ package co.wethinkcode.logisticsconnect;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import java.io.InputStream;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
-public class IngestionServiceTest {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class IngestionServiceTest
+{
     private IngestionService service;
 
     @BeforeEach
@@ -61,5 +70,22 @@ public class IngestionServiceTest {
         assertTrue(oneRow.isActive());
         assertFalse(zeroRow.isActive());
         assertFalse(falseRow.isActive());
+    }
+
+    /**
+     * Verifies that duplicate sorting centers in hubs-global.csv are collapsed.
+     */
+    @Test
+    public void testCleanCsv_RemovesDuplicatesWithoutHardcodingRowCount()
+    {
+        InputStream stream = getClass().getResourceAsStream("/hubs-global.csv");
+        List<Hub> cleanedList = service.cleanCsv(stream);
+
+        Set<String> seenSortingCenters = new HashSet<>();
+        for (Hub item : cleanedList)
+        {
+            boolean isUnique = seenSortingCenters.add(item.getSortingCenter());
+            assertTrue(isUnique, "Duplicate sorting center found: " + item.getSortingCenter());
+        }
     }
 }
