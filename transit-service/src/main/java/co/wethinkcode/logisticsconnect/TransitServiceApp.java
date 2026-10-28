@@ -2,7 +2,14 @@ package co.wethinkcode.logisticsconnect;
 
 import io.javalin.Javalin;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
 public class TransitServiceApp {
+
+    private static final HttpClient httpClient = HttpClient.newHttpClient();
 
     public static void main(String[] args) {
         Javalin app = Javalin.create().start(7053);
@@ -43,6 +50,41 @@ public class TransitServiceApp {
         return "{\"hubId\":\"" + hubId.trim().toUpperCase()
                 + "\",\"delayStage\":" + stage
                 + ",\"estimatedHours\":" + etaHours + "}";
+    }
+
+    /**
+     * Calls hub-service (port 7051) to verify whether a hub ID exists.
+     */
+    private static boolean isValidHub(String hubId) throws Exception
+    {
+        String cleanId = hubId.trim().toUpperCase();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:7051/hubs/" + cleanId))
+                .GET()
+                .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        return response.statusCode() == 200;
+    }
+
+    /**
+     * Queries delay-stage-service (port 7052) for the hub's current delay stage.
+     */
+    private static int fetchDelayStage(String hubId)
+    {
+        try
+        {
+            String cleanId = hubId.trim().toUpperCase();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("http://localhost:7052/delay-stage/" + cleanId))
+                    .GET()
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            return extractStage(response.body());
+        }
+        catch (Exception e)
+        {
+            return 0;
+        }
     }
 }
 
