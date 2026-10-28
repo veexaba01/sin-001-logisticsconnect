@@ -7,10 +7,13 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.HashMap;
+import java.util.Map;
 
 public class TransitServiceApp {
 
     private static final HttpClient httpClient = HttpClient.newHttpClient();
+    private static final Map<String, Integer> stagesByHub = new HashMap<>();
 
     public static void main(String[] args) {
         Javalin app = Javalin.create().start(7053);
@@ -123,6 +126,39 @@ public class TransitServiceApp {
         double etaHours = calculateEtaHours(stage);
         ctx.status(200).contentType("application/json")
                 .result(buildEtaJson(hubId, stage, etaHours));
+    }
+
+    /**
+     * Extracts the hub ID from a JSON payload like {"hubId":"H-501","stage":5}.
+     */
+    public static String extractHubId(String json)
+    {
+        if (json == null)
+        {
+            return null;
+        }
+        String[] parts = json.split("\"");
+        return (parts.length > 3) ? parts[3].trim().toUpperCase() : null;
+    }
+
+    /**
+     * Updates the cached delay stage for the hub specified in a topic message.
+     */
+    public static void updateStageFromMessage(String messageText)
+    {
+        String hubId = extractHubId(messageText);
+        if (hubId != null)
+        {
+            stagesByHub.put(hubId, extractStage(messageText));
+        }
+    }
+
+    /**
+     * Returns the cached delay stage for a hub (defaults to 0 if not yet received).
+     */
+    public static int getCachedStage(String hubId)
+    {
+        return stagesByHub.getOrDefault(hubId.trim().toUpperCase(), 0);
     }
 }
 
