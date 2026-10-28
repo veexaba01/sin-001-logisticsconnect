@@ -1,8 +1,11 @@
 package co.wethinkcode.logisticsconnect;
 
+import co.wethinkcode.logisticsconnect.mq.MqConfig;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
+import org.apache.activemq.ActiveMQConnectionFactory;
 
+import javax.jms.*;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -17,6 +20,7 @@ public class TransitServiceApp {
 
     public static void main(String[] args) {
         Javalin app = Javalin.create().start(7053);
+        subscribeToPackageStatusTopic();
 
         app.get("/health", ctx -> ctx.result("OK"));
 
@@ -26,70 +30,41 @@ public class TransitServiceApp {
     }
 
     /**
-     * Calculates estimated transit time in hours.
+     * Subscribes to the ActiveMQ package status topic to receive hub delay stage changes.
      */
-    public static double calculateEtaHours(int delayStage)
-    {
-        return 24.0 + (delayStage * 4.0);
-    }
-
-    /**
-     * Extracts the integer delay stage after the stage key in a JSON payload.
-     */
-    public static int extractStage(String json)
-    {
-        if (json == null || !json.contains("\"stage\""))
-        {
-            return 0;
-        }
-        String afterStage = json.substring(json.indexOf("\"stage\"") + 7);
-        String digits = afterStage.replaceAll("[^0-9]", "");
-        return digits.isEmpty() ? 0 : Integer.parseInt(digits);
-    }
-
-    /**
-     * Formats the hub ETA response as a JSON string.
-     */
-    public static String buildEtaJson(String hubId, int stage, double etaHours)
-    {
-        return "{\"hubId\":\"" + hubId.trim().toUpperCase()
-                + "\",\"delayStage\":" + stage
-                + ",\"estimatedHours\":" + etaHours + "}";
-    }
-
-    /**
-     * Calls hub-service (port 7051) to verify whether a hub ID exists.
-     */
-    private static boolean isValidHub(String hubId) throws Exception
-    {
-        String cleanId = hubId.trim().toUpperCase();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("http://localhost:7051/hubs/" + cleanId))
-                .GET()
-                .build();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        return response.statusCode() == 200;
-    }
-
-    /**
-     * Queries delay-stage-service (port 7052) for the hub's current delay stage.
-     */
-    private static int fetchDelayStage(String hubId)
+    private static void subscribeToPackageStatusTopic()
     {
         try
         {
-            String cleanId = hubId.trim().toUpperCase();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("http://localhost:7052/delay-stage/" + cleanId))
-                    .GET()
-                    .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            return extractStage(response.body());
+            ConnectionFactory factory = new ActiveMQConnectionFactory(MqConfig.BROKER_URL);
+            Connection connection = factory.createConnection();
+            connection.start();
+
+            Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+            Topic topic = session.createTopic(MqConfig.TOPIC);
+            MessageConsumer consumer = session.createConsumer(topic);
+            consumer.setMessageListener(TransitServiceApp::handleIncomingMessage);
         }
         catch (Exception e)
         {
-            return 0;
+            System.out.println("ActiveMQ broker not running: " + e.getMessage());
         }
+    }
+
+    /**
+     * Processes incoming ActiveMQ topic messages containing hub delay stage updates.
+     */
+    private static void handleIncomingMessage(Message message)
+    {
+        try
+        {
+            if (message instanceof TextMessage textMessage)
+            {
+                updateStageFromMessage(textMessage.getText());
+            }
+        }
+        catch (Exception ignored)
+        {}
     }
 
     /**
@@ -122,10 +97,24 @@ public class TransitServiceApp {
             return;
         }
 
-        int stage = fetchDelayStage(hubId);
+        int stage = getCachedStage(hubId);
         double etaHours = calculateEtaHours(stage);
         ctx.status(200).contentType("application/json")
                 .result(buildEtaJson(hubId, stage, etaHours));
+    }
+
+    /**
+     * Calls hub-service on port 7051 to verify whether a hub ID exists.
+     */
+    private static boolean isValidHub(String hubId) throws Exception
+    {
+        String cleanId = hubId.trim().toUpperCase();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:7051/hubs/" + cleanId))
+                .GET()
+                .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        return response.statusCode() == 200;
     }
 
     /**
@@ -159,6 +148,38 @@ public class TransitServiceApp {
     public static int getCachedStage(String hubId)
     {
         return stagesByHub.getOrDefault(hubId.trim().toUpperCase(), 0);
+    }
+
+    /**
+     * Calculates estimated transit time in hours.
+     */
+    public static double calculateEtaHours(int delayStage)
+    {
+        return 24.0 + (delayStage * 4.0);
+    }
+
+    /**
+     * Extracts the integer delay stage after the stage key in a JSON payload.
+     */
+    public static int extractStage(String json)
+    {
+        if (json == null || !json.contains("\"stage\""))
+        {
+            return 0;
+        }
+        String afterStage = json.substring(json.indexOf("\"stage\"") + 7);
+        String digits = afterStage.replaceAll("[^0-9]", "");
+        return digits.isEmpty() ? 0 : Integer.parseInt(digits);
+    }
+
+    /**
+     * Formats the hub ETA response as a JSON string.
+     */
+    public static String buildEtaJson(String hubId, int stage, double etaHours)
+    {
+        return "{\"hubId\":\"" + hubId.trim().toUpperCase()
+                + "\",\"delayStage\":" + stage
+                + ",\"estimatedHours\":" + etaHours + "}";
     }
 }
 
