@@ -27,4 +27,15 @@ public class TransitServiceTest
         assertEquals(3, TransitServiceApp.extractStage(json));
         assertEquals(0, TransitServiceApp.extractStage("invalid"));
     }
+
+    /**
+     * Verifies that incoming topic JSON updates the cached delay stage for that hub.
+     */
+    @Test
+    public void testUpdateStageFromMessage_UpdatesHubDelayStage()
+    {
+        TransitServiceApp.updateStageFromMessage("{\"hubId\":\"H-501\",\"stage\":5}");
+        assertEquals(5, TransitServiceApp.getCachedStage("H-501"));
+        assertEquals(0, TransitServiceApp.getCachedStage("H-999"));
+    }
 }
