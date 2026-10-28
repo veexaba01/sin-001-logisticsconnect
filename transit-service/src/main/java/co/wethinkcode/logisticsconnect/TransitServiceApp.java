@@ -1,6 +1,7 @@
 package co.wethinkcode.logisticsconnect;
 
 import io.javalin.Javalin;
+import io.javalin.http.Context;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -18,6 +19,7 @@ public class TransitServiceApp {
 
         // TODO (Calculates estimated arrival windows based on hub and delay stage.)
         // Add domain endpoints for transit-service here.
+        app.get("/eta/{hubId}", TransitServiceApp::handleGetEta);
     }
 
     /**
@@ -85,6 +87,42 @@ public class TransitServiceApp {
         {
             return 0;
         }
+    }
+
+    /**
+     * Handles GET /eta/{hubId} requests by validating the hub and returning the ETA.
+     */
+    private static void handleGetEta(Context ctx)
+    {
+        String hubId = ctx.pathParam("hubId").trim().toUpperCase();
+
+        try
+        {
+            sendEtaOrNotFound(ctx, hubId);
+        }
+        catch (Exception e)
+        {
+            ctx.status(503).contentType("application/json")
+                    .result("{\"error\":\"Hub service is unreachable\"}");
+        }
+    }
+
+    /**
+     * Sends 200 OK with the ETA if the hub is valid, or 404 Not Found if unknown.
+     */
+    private static void sendEtaOrNotFound(Context ctx, String hubId) throws Exception
+    {
+        if (!isValidHub(hubId))
+        {
+            ctx.status(404).contentType("application/json")
+                    .result("{\"error\":\"Hub not found\",\"hubId\":\"" + hubId + "\"}");
+            return;
+        }
+
+        int stage = fetchDelayStage(hubId);
+        double etaHours = calculateEtaHours(stage);
+        ctx.status(200).contentType("application/json")
+                .result(buildEtaJson(hubId, stage, etaHours));
     }
 }
 
